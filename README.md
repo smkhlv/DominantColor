@@ -2,6 +2,10 @@
 
 GPU-accelerated dominant color extraction for iOS. Builds a 3D RGB histogram on the GPU via Metal compute shaders and selects a perceptually diverse 5-color palette with Spotify-style gradient generation.
 
+<p align="center">
+  <img src="Assets/demo.png" alt="DominantColorKit demo" width="300">
+</p>
+
 ## Features
 
 - Full GPU pipeline: downscale + histogram in a single Metal command buffer

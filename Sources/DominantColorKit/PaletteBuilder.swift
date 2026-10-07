@@ -60,7 +60,8 @@ enum PaletteBuilder {
             colors: selected,
             primary: primary,
             secondary: secondary,
-            gradientStops: GradientGenerator.makeStops(primary: primary, secondary: secondary)
+            gradientStops: GradientGenerator.makeStops(primary: primary, secondary: secondary),
+            textColor: ContrastText.color(on: primary)
         )
     }
 

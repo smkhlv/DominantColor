@@ -20,4 +20,8 @@ public struct DominantColorResult: Sendable {
     /// - `[1]` — secondary colour (middle)
     /// - `[2]` — perceptually darkened primary (bottom)
     public let gradientStops: [SIMD3<Float>]
+
+    /// Text colour for drawing on top of `primary`: same hue, WCAG contrast ≥ 4.5:1.
+    /// See ``ContrastText``.
+    public let textColor: SIMD3<Float>
 }

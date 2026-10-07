@@ -126,6 +126,13 @@ struct ContentView: View {
                 }
             }
             .frame(maxWidth: .infinity)
+
+            Text("Aa — sample text")
+                .font(.headline)
+                .foregroundStyle(Color(simd: result.textColor))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color(simd: result.primary), in: RoundedRectangle(cornerRadius: 8))
         }
         .padding()
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))

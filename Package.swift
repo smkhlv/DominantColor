@@ -15,12 +15,7 @@ let package = Package(
         )
     ],
     targets: [
-        .target(
-            name: "DominantColorKit",
-            resources: [
-                .process("Metal")
-            ]
-        ),
+        .target(name: "DominantColorKit"),
         .testTarget(
             name: "DominantColorKitTests",
             dependencies: ["DominantColorKit"]

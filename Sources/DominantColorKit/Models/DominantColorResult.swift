@@ -2,7 +2,8 @@ import simd
 
 /// The result of a dominant-colour extraction pass.
 ///
-/// All colours are expressed in linear sRGB, components in `[0, 1]`.
+/// All colours are **gamma-encoded sRGB** (the values you'd write as `#RRGGBB / 255`),
+/// components in `[0, 1]`. Do NOT apply a gamma curve before display.
 public struct DominantColorResult: Sendable {
     /// The 5 most dominant colours sorted by descending pixel coverage.
     public let colors: [SIMD3<Float>]

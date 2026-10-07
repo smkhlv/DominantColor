@@ -1,6 +1,6 @@
 # DominantColorKit
 
-GPU-accelerated dominant color extraction for iOS. Builds a 3D RGB histogram on the GPU via Metal compute shaders and selects a perceptually diverse 5-color palette with Spotify-style gradient generation.
+Dominant color extraction for iOS on the CPU. Decodes a small ImageIO thumbnail, builds a 16³ RGB histogram and selects a perceptually diverse 5-color palette with Spotify-style gradient generation.
 
 <p align="center">
   <img src="Assets/demo.png" alt="DominantColorKit demo" width="300">
@@ -8,10 +8,10 @@ GPU-accelerated dominant color extraction for iOS. Builds a 3D RGB histogram on 
 
 ## Features
 
-- Full GPU pipeline: downscale + histogram in a single Metal command buffer
+- ImageIO thumbnail (≤96 px, subsampled decode) + 16³ histogram; stateless and `Sendable`
 - Perceptual palette selection: saturation-weighted scoring with minimum-distance diversity constraint
 - Spotify-style 3-stop vertical gradient from extracted colors
-- Accepts `UIImage`, `CGImage`, `CVPixelBuffer`, or `MTLTexture`
+- Accepts encoded `Data` (preferred), `CGImage`, or `UIImage`; colors are gamma-encoded sRGB
 - async/await API
 - iOS 16+, Swift 5.9+
 
@@ -32,8 +32,8 @@ Or in Xcode: File > Add Package Dependencies, paste the repository URL.
 ```swift
 import DominantColorKit
 
-let extractor = try DominantColorExtractor()
-let result = try await extractor.extract(from: image)
+let extractor = DominantColorExtractor()
+let result = try await extractor.extract(from: data)   // encoded JPEG/PNG/HEIC bytes
 
 // 5 dominant colors sorted by perceptual relevance
 result.colors     // [SIMD3<Float>]
@@ -46,27 +46,12 @@ result.gradientStops  // [SIMD3<Float>]
 
 ## Architecture
 
-```
-Input image
-    |
-    v
-[GPU] Downscale (bilinear, 128x128)
-    |
-    v
-[GPU] 3D Histogram (16^3 = 4096 bins, threadgroup atomics)
-    |
-    v
-[CPU] Weighted diverse selection (4096 bins, ~0.01 ms)
-    |
-    v
-DominantColorResult { colors, primary, secondary, gradientStops }
-```
+1. **Thumbnail** — ImageIO decodes straight to ≤96 px on the long side (JPEG/HEIC are subsampled during decode; the full image is never materialised).
+2. **Raster** — draw into an 8-bit sRGB RGBA buffer (~37 KB).
+3. **Histogram** — 16³ bins with per-bin colour sums; pixels with alpha < 50 % are skipped.
+4. **Select** — saturation-weighted score, greedy diverse pick of 5 colours.
 
-### Why hybrid GPU + CPU?
-
-The histogram is the heavy part: 16K pixels with atomic increments across threadgroup-shared memory. Metal handles this in parallel across all GPU cores.
-
-The palette selection over 4,096 bins is inherently sequential (each pick depends on previous picks for diversity). CPU processes this in ~0.01 ms, faster than the Metal kernel launch overhead alone.
+Result: `DominantColorResult { colors, primary, secondary, gradientStops }`.
 
 ### Palette selection algorithm
 
@@ -86,14 +71,11 @@ This prevents palettes filled with 5 shades of white/gray and favors visually in
 DominantColor/
   Package.swift
   Sources/DominantColorKit/
-    DominantColorExtractor.swift    # Main API, Metal pipeline orchestration
+    DominantColorExtractor.swift    # Main API, ImageIO + raster pipeline
+    PaletteBuilder.swift            # Histogram + palette selection
     GradientGenerator.swift         # Spotify-style 3-stop gradient
     Models/
       DominantColorResult.swift     # Output struct
-    Metal/
-      Downscale.metal               # Bilinear downsample compute kernel
-      Histogram.metal               # 3D RGB histogram with threadgroup atomics
-      ReduceTopColors.metal         # GPU top-K reduction (available, unused)
   Example/
     DominantColor.xcodeproj
     DominantColor/                  # SwiftUI demo app
@@ -110,29 +92,11 @@ Open `Example/DominantColor.xcodeproj` in Xcode. The app demonstrates:
 
 ## Performance
 
-| Stage | Device | Time |
-|-------|--------|------|
-| GPU downscale + histogram | iPhone (simulator) | 50-200 ms |
-| CPU palette selection | any | ~0.01 ms |
-
-Real device performance is significantly better than simulator. Metal compute on A-series/M-series chips typically completes the full pipeline in under 10 ms.
-
-## Metal shader details
-
-**Downscale.metal** — Bilinear downsample using hardware texture sampler. Maps each destination pixel to normalized source coordinates for quality interpolation at any scale ratio.
-
-**Histogram.metal** — Two-level atomic accumulation. Each 16x16 threadgroup zeros a local 4,096-bin histogram in shared memory, accumulates pixel contributions with `atomic_fetch_add`, then flushes non-zero bins to the global device buffer. This minimizes contention on device memory.
-
-**ReduceTopColors.metal** — Single-threadgroup parallel top-5 scan. Available in the metallib but currently unused in favor of the CPU-side weighted selection which produces better perceptual results.
+See `docs/decisions/2026-10-07-dominant-color-benchmark.md` for measured numbers (12 MP JPEG, simulator).
 
 ## Memory footprint
 
-| Resource | Size |
-|----------|------|
-| Histogram buffer | 16 KiB |
-| Downscale texture (128x128 RGBA) | 64 KiB |
-| Source texture (shared, temporary) | varies |
-| **Total pipeline overhead** | **~80 KiB** |
+Working set is the ≤96 px thumbnail (~37 KB RGBA) plus a 16³-bin histogram (counts + color sums, ~64 KB).
 
 ## License
 

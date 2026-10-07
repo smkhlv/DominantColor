@@ -1,9 +1,9 @@
+import Foundation
 import Testing
 import simd
 @testable import DominantColorKit
 
-/// Task 2 changes this to the non-throwing `DominantColorExtractor()`.
-func makeExtractor() throws -> DominantColorExtractor { try DominantColorExtractor() }
+func makeExtractor() -> DominantColorExtractor { DominantColorExtractor() }
 
 struct ExtractorCorrectnessTests {
     static let navy = TestImages.RGB(r: 0x1A, g: 0x2B, b: 0x3C)
@@ -33,7 +33,7 @@ struct ExtractorCorrectnessTests {
 
     @Test("Concurrent extractions don't corrupt each other")
     func concurrentExtractionsAgree() async throws {
-        let extractor = try makeExtractor()
+        let extractor = makeExtractor()
         let image = TestImages.split(background: Self.lightGray, object: Self.red, objectFraction: 0.3)
         let reference = try await extractor.extract(from: image).primary
         // Determinism control: sequential runs must agree before concurrency is blamed.
@@ -45,5 +45,19 @@ struct ExtractorCorrectnessTests {
         }
         let mismatches = results.filter { $0 != reference }.count
         #expect(mismatches == 0, "\(mismatches) of \(results.count) concurrent runs differ from reference \(reference)")
+    }
+
+    @Test("Encoded bytes go through ImageIO and match the CGImage path")
+    func dataPathMatchesCGImagePath() async throws {
+        let png = TestImages.png(TestImages.solid(Self.navy))
+        let result = try await makeExtractor().extract(from: png)
+        #expect(result.primary.maxChannelDelta255(Self.navy) <= 1.5)
+    }
+
+    @Test("Garbage bytes throw invalidImage")
+    func garbageThrows() async {
+        await #expect(throws: DominantColorError.invalidImage) {
+            try await makeExtractor().extract(from: Data([0, 1, 2, 3]))
+        }
     }
 }

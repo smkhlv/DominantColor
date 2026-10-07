@@ -9,9 +9,7 @@ struct ContentView: View {
     @State private var extractionTimeMs: Double?
     @State private var isProcessing = false
 
-    private let extractor: DominantColorExtractor? = {
-        try? DominantColorExtractor()
-    }()
+    private let extractor = DominantColorExtractor()
 
     var body: some View {
         ZStack {
@@ -158,11 +156,9 @@ struct ContentView: View {
 
         selectedImage = uiImage
 
-        guard let extractor else { return }
-
         let start = CFAbsoluteTimeGetCurrent()
         do {
-            let extracted = try await extractor.extract(from: uiImage)
+            let extracted = try await extractor.extract(from: data)
             let elapsed = (CFAbsoluteTimeGetCurrent() - start) * 1000.0
             withAnimation(.easeInOut(duration: 0.4)) {
                 result = extracted

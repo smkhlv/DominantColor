@@ -20,6 +20,10 @@ let package = Package(
             resources: [
                 .process("Metal")
             ]
+        ),
+        .testTarget(
+            name: "DominantColorKitTests",
+            dependencies: ["DominantColorKit"]
         )
     ]
 )

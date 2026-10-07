@@ -36,10 +36,14 @@ struct ExtractorCorrectnessTests {
         let extractor = try makeExtractor()
         let image = TestImages.split(background: Self.lightGray, object: Self.red, objectFraction: 0.3)
         let reference = try await extractor.extract(from: image).primary
+        // Determinism control: sequential runs must agree before concurrency is blamed.
+        let control = try await extractor.extract(from: image).primary
+        #expect(control == reference, "sequential control differs: \(control) vs \(reference)")
         let results = try await withThrowingTaskGroup(of: SIMD3<Float>.self) { group in
             for _ in 0..<50 { group.addTask { try await extractor.extract(from: image).primary } }
             return try await group.reduce(into: [SIMD3<Float>]()) { $0.append($1) }
         }
-        #expect(results.allSatisfy { $0 == reference })
+        let mismatches = results.filter { $0 != reference }.count
+        #expect(mismatches == 0, "\(mismatches) of \(results.count) concurrent runs differ from reference \(reference)")
     }
 }
